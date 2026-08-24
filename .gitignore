@@ -1,0 +1,15 @@
+.env
+package/*
+!package/.gitkeep
+models/*
+!models/.gitkeep
+models/*.sha256
+data/*
+!data/searxng/
+data/searxng/*
+!data/searxng/.gitkeep
+logs/*
+!logs/.gitkeep
+__pycache__/
+*.pyc
+.DS_Store

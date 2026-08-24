@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+load_env
+backend="${1:-nvidia}"
+service="${2:-}"
+require_docker
+if [[ -n "$service" ]]; then
+  compose "$backend" logs --tail 200 "$service"
+else
+  compose "$backend" logs --tail 200
+fi

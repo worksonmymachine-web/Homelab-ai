@@ -1,0 +1,122 @@
+name: homelab-ai
+
+services:
+  llama:
+    container_name: homelab-ai-llama
+    image: ${LLAMA_CPU_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b10524}
+    restart: "no"
+    command:
+      - --model
+      - /models/${MODEL_FILE:-qwen2.5-1.5b-instruct-q4_k_m.gguf}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - ${LLAMA_CTX_SIZE:-4096}
+      - --n-gpu-layers
+      - ${LLAMA_GPU_LAYERS:-auto}
+      - --threads
+      - ${LLAMA_THREADS:-8}
+    volumes:
+      - ./models:/models:ro
+    networks:
+      homelab-ai-net:
+        aliases:
+          - homelab-ai-llama
+    labels:
+      io.homelab-ai.project: homelab-ai
+      io.homelab-ai.component: llama
+
+  litellm:
+    container_name: homelab-ai-litellm
+    image: ${LITELLM_IMAGE:-ghcr.io/berriai/litellm:v1.94.0}
+    restart: "no"
+    command:
+      - --config
+      - /app/config.yaml
+      - --port
+      - "4000"
+      - --host
+      - 0.0.0.0
+    environment:
+      LITELLM_MODEL_NAME: ${LITELLM_MODEL_NAME:-local-qwen}
+    volumes:
+      - ./config/litellm/config.yaml:/app/config.yaml:ro
+    ports:
+      - 127.0.0.1:${LITELLM_PORT:-4000}:4000
+    depends_on:
+      - llama
+    networks:
+      homelab-ai-net:
+        aliases:
+          - homelab-ai-litellm
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      io.homelab-ai.project: homelab-ai
+      io.homelab-ai.component: litellm
+
+  searxng:
+    container_name: homelab-ai-searxng
+    image: ${SEARXNG_IMAGE:-ghcr.io/searxng/searxng:2026.8.20-8d3dd0cd4}
+    restart: "no"
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-REPLACE_ME}
+      SEARXNG_LIMITER: "false"
+      SEARXNG_BASE_URL: http://localhost:${SEARXNG_PORT:-8888}/
+    volumes:
+      - ./config/searxng:/etc/searxng
+      - ./data/searxng:/var/cache/searxng
+    ports:
+      - 127.0.0.1:${SEARXNG_PORT:-8888}:8080
+    networks:
+      homelab-ai-net:
+        aliases:
+          - homelab-ai-searxng
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      io.homelab-ai.project: homelab-ai
+      io.homelab-ai.component: searxng
+
+  sandbox:
+    container_name: homelab-ai-sandbox
+    image: ${SANDBOX_IMAGE:-homelab-ai-sandbox:0.1.0}
+    build:
+      context: ./docker/sandbox
+      dockerfile: Dockerfile
+      args:
+        SANDBOX_UID: ${SANDBOX_UID:-1000}
+        SANDBOX_GID: ${SANDBOX_GID:-1000}
+    restart: "no"
+    init: true
+    user: "${SANDBOX_UID:-1000}:${SANDBOX_GID:-1000}"
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+    volumes:
+      - ./workspace:/workspace
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: ${SANDBOX_PIDS:-256}
+    mem_limit: ${SANDBOX_MEMORY:-2g}
+    cpus: ${SANDBOX_CPUS:-2.0}
+    networks:
+      homelab-ai-net:
+        aliases:
+          - homelab-ai-sandbox
+    labels:
+      io.homelab-ai.project: homelab-ai
+      io.homelab-ai.component: sandbox
+
+networks:
+  homelab-ai-net:
+    name: homelab-ai-net
+    driver: bridge
+    labels:
+      io.homelab-ai.project: homelab-ai

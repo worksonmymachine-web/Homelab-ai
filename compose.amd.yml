@@ -1,0 +1,7 @@
+# FUTURE AMD CANDIDATE - NOT VALIDATED ON THE TARGET MACHINE.
+# Default candidate follows the design guide: llama.cpp Vulkan first.
+# Device/runtime passthrough is intentionally not invented here because
+# Windows 11 + WSL2 support must be verified on the actual AMD machine.
+services:
+  llama:
+    image: ${LLAMA_AMD_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-vulkan-b10524}

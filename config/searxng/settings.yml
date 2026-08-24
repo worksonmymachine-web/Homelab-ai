@@ -1,0 +1,17 @@
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "Homelab AI Search"
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json
+
+server:
+  # Overwritten by SEARXNG_SECRET from .env.
+  secret_key: "REPLACE_ME"
+  limiter: false
+  image_proxy: true

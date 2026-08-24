@@ -1,0 +1,5 @@
+# NVIDIA-only override for the temporary RTX development PC.
+services:
+  llama:
+    image: ${LLAMA_NVIDIA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda13-b10524}
+    gpus: all

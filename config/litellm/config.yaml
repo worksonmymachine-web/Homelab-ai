@@ -1,0 +1,10 @@
+model_list:
+  - model_name: local-qwen
+    litellm_params:
+      model: openai/local-qwen
+      api_base: http://homelab-ai-llama:8080/v1
+      api_key: not-needed
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 120
