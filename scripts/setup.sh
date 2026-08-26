@@ -33,6 +33,6 @@ else
   echo ".env already exists; leaving it unchanged."
 fi
 
-mkdir -p "$PROJECT_DIR"/{models,data/searxng,data/postgres,logs,workspace,package}
+mkdir -p "$PROJECT_DIR"/{models,data/searxng,data/postgres,data/qdrant,logs,workspace,package}
 chmod 700 "$PROJECT_DIR/.env"
 echo "Setup complete."
