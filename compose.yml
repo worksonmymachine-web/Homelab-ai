@@ -114,6 +114,35 @@ services:
       io.homelab-ai.project: homelab-ai
       io.homelab-ai.component: sandbox
 
+
+  postgres:
+    container_name: homelab-ai-postgres
+    image: ${POSTGRES_IMAGE:-postgres:18.6-bookworm}
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-homelab_ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-homelab_ai}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      homelab-ai-net:
+        aliases:
+          - homelab-ai-postgres
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      io.homelab-ai.project: homelab-ai
+      io.homelab-ai.component: postgres
+
 networks:
   homelab-ai-net:
     name: homelab-ai-net

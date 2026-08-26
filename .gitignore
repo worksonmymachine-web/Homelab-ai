@@ -8,6 +8,9 @@ data/*
 !data/searxng/
 data/searxng/*
 !data/searxng/.gitkeep
+!data/postgres/
+data/postgres/*
+!data/postgres/.gitkeep
 logs/*
 !logs/.gitkeep
 __pycache__/

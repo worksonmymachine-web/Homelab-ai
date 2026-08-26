@@ -71,9 +71,22 @@ t8() {
     "$llama_img" \
     "${LITELLM_IMAGE:-ghcr.io/berriai/litellm:v1.94.0}" \
     "${SEARXNG_IMAGE:-ghcr.io/searxng/searxng:2026.8.20-8d3dd0cd4}" \
-    "${SANDBOX_IMAGE:-homelab-ai-sandbox:0.1.0}"; do
+    "${SANDBOX_IMAGE:-homelab-ai-sandbox:0.1.0}" \
+    "${POSTGRES_IMAGE:-postgres:18.6-bookworm}"; do
     docker image inspect "$img" >/dev/null || return 1
   done
+}
+
+
+t9() {
+  container_running homelab-ai-postgres || return 1
+  docker exec homelab-ai-postgres pg_isready \
+    -U "${POSTGRES_USER:-homelab_ai}" \
+    -d "${POSTGRES_DB:-homelab_ai}" >/dev/null 2>&1 || return 1
+  [[ "$(docker exec homelab-ai-postgres psql \
+    -U "${POSTGRES_USER:-homelab_ai}" \
+    -d "${POSTGRES_DB:-homelab_ai}" \
+    -Atqc 'SELECT 1;')" == "1" ]]
 }
 
 require_docker || exit 1
@@ -85,10 +98,11 @@ run_test 5 "Sandbox executes code as non-root" t5
 run_test 6 "Internal project network works" t6
 run_test 7 "Sandbox isolation invariants" t7
 run_test 8 "Required image set is resolvable for export" t8
+run_test 9 "PostgreSQL healthy" t9
 
 printf '\n==============================\n'
 if (( failures == 0 )); then
-  echo "PASS: all 8 smoke tests passed"
+  echo "PASS: all 9 smoke tests passed"
   exit 0
 else
   echo "FAIL: $failures test(s) failed"
