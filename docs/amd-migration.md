@@ -58,3 +58,14 @@ Do not declare AMD migration complete until all smoke tests pass and llama-serve
 - generic scripts
 
 The hardware-specific work should remain concentrated in `compose.amd.yml`, `.env` image selection, and host driver/runtime setup.
+
+## Known gaps to close before/while validating on the real AMD PC
+
+- **`scripts/export.sh`**: it now selects the llama image per backend (`nvidia`/`amd`/`cpu`) the same way `scripts/test.sh` (test 8) already did. Re-verify this branch-aware selection actually exports the right AMD image once `backend=amd` runs for real, since it has not been exercised on real AMD hardware yet.
+- **`scripts/preflight.sh` (`amd` branch)**: today it only checks the `ALLOW_UNVALIDATED_AMD` gate; it does **not** perform any real hardware check equivalent to the `nvidia-smi` probe used for the `nvidia` branch. TODO once the WSL2 procedure is known: add an equivalent check (e.g. `rocminfo` for ROCm, or `vulkaninfo` for the Vulkan-first candidate) before allowing preflight to pass. Do not implement this blindly — the correct probe depends on which runtime path (Vulkan vs ROCm) is actually confirmed working on the target machine.
+- **GPU tuning differences**: `LLAMA_GPU_LAYERS` and `LLAMA_CTX_SIZE` in `.env.example` are currently tuned for the CUDA/NVIDIA smoke test. Vulkan/ROCm on Strix Halo may support a different number of offloadable layers and a different safe context size — both values must be re-checked once the real layer count and memory behavior are known on the target hardware, not assumed to carry over from the NVIDIA baseline.
+- **Rollback strategy**: if `backend=amd` validation fails partway through (`preflight`/`build`/`start`/`test`), do not attempt to patch the AMD path in place. Instead:
+  1. `./scripts/stop.sh amd` (or `docker compose ... down` via the amd override) to remove any partially-started AMD containers;
+  2. set `ALLOW_UNVALIDATED_AMD=0` again in `.env` to re-close the gate;
+  3. resume validated work on `backend=cpu` (or `backend=nvidia` on the temporary PC) — both remain fully unaffected because no AMD-specific state is written outside `compose.amd.yml` and `.env`;
+  4. only re-open `ALLOW_UNVALIDATED_AMD=1` after the specific failure is understood and `compose.amd.yml`/`docs/amd-migration.md` are updated accordingly.

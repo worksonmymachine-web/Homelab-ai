@@ -9,6 +9,11 @@ require_docker
 with_images=0
 with_models=0
 with_workspace=0
+backend="nvidia"
+if [[ $# -gt 0 && "$1" != --* ]]; then
+  backend="$1"
+  shift
+fi
 for arg in "$@"; do
   case "$arg" in
     --with-images) with_images=1 ;;
@@ -40,8 +45,15 @@ if (( with_workspace )); then cp -a "$PROJECT_DIR/workspace/." "$out/project/wor
   echo "workspace_included=$with_workspace"
 } > "$out/metadata/export.txt"
 
+case "$backend" in
+  nvidia) llama_img="${LLAMA_NVIDIA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda13-b10524}" ;;
+  amd) llama_img="${LLAMA_AMD_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-vulkan-b10524}" ;;
+  cpu) llama_img="${LLAMA_CPU_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b10524}" ;;
+  *) echo "Unknown backend: $backend" >&2; exit 2 ;;
+esac
+
 images=(
-  "${LLAMA_NVIDIA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda13-b10524}"
+  "$llama_img"
   "${LITELLM_IMAGE:-ghcr.io/berriai/litellm:v1.94.0}"
   "${SEARXNG_IMAGE:-ghcr.io/searxng/searxng:2026.8.20-8d3dd0cd4}"
   "${SANDBOX_IMAGE:-homelab-ai-sandbox:0.1.0}"
@@ -61,7 +73,7 @@ done
 if (( with_images )); then
   missing=0
   for img in "${images[@]}"; do docker image inspect "$img" >/dev/null 2>&1 || missing=1; done
-  (( missing == 0 )) || { echo "FAIL: one or more required images are missing; run ./scripts/build.sh nvidia" >&2; exit 1; }
+  (( missing == 0 )) || { echo "FAIL: one or more required images are missing; run ./scripts/build.sh $backend" >&2; exit 1; }
   mkdir -p "$out/images"
   docker save -o "$out/images/homelab-ai-images.tar" "${images[@]}"
   sha256sum "$out/images/homelab-ai-images.tar" > "$out/images/homelab-ai-images.tar.sha256"
