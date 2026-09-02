@@ -14,7 +14,8 @@ echo "Project: $PROJECT_DIR"
 echo "Docker: $(docker version --format '{{.Server.Version}}')"
 echo "Compose: $(docker compose version --short)"
 
-for name in homelab-ai-llama homelab-ai-litellm homelab-ai-searxng homelab-ai-sandbox; do
+for name in homelab-ai-llama homelab-ai-litellm homelab-ai-searxng homelab-ai-sandbox \
+            homelab-ai-postgres homelab-ai-qdrant; do
   if docker container inspect "$name" >/dev/null 2>&1; then
     if is_our_container "$name"; then
       echo "INFO: existing project container: $name"
@@ -81,6 +82,64 @@ elif [[ "$backend" == "amd" ]]; then
     fail "AMD backend is intentionally unvalidated; follow docs/amd-migration.md first"
     errors=$((errors+1))
   fi
+
+  # Hardware probe for the amd branch.
+  # Closes the gap listed in docs/amd-migration.md ("Known gaps"): preflight amd
+  # had no real hardware check equivalent to the nvidia-smi probe.
+  #
+  # Which probe is correct depends on the runtime actually in use, exactly as
+  # that document warns. compose.amd.yml pins the Vulkan server image, so
+  # vulkan is the default; set AMD_RUNTIME=rocm in .env to probe ROCm instead.
+  amd_runtime="${AMD_RUNTIME:-vulkan}"
+  expected_gfx="${AMD_EXPECTED_GFX:-gfx1151}"
+
+  case "$amd_runtime" in
+    vulkan)
+      if ! command -v vulkaninfo >/dev/null 2>&1; then
+        fail "vulkaninfo not found in WSL (apt install vulkan-tools); cannot confirm the GPU is visible"
+        errors=$((errors+1))
+      else
+        gpu_line="$(vulkaninfo --summary 2>/dev/null | grep -i 'deviceName' | head -n1 || true)"
+        if [[ -z "$gpu_line" ]]; then
+          fail "vulkaninfo reports no Vulkan device inside WSL"
+          errors=$((errors+1))
+        elif grep -qi 'llvmpipe' <<< "$gpu_line"; then
+          # llvmpipe is Mesa's software rasteriser. If it is the reported device
+          # there is no GPU acceleration at all, and llama-server will run on CPU
+          # WITHOUT reporting an error. Catching that here is the whole point of
+          # this probe: the alternative is discovering it in a benchmark.
+          fail "Vulkan is falling back to llvmpipe (software rendering) - this is the silent CPU path"
+          errors=$((errors+1))
+        elif ! grep -qiE 'radeon|amd' <<< "$gpu_line"; then
+          fail "Vulkan device is not an AMD GPU: $gpu_line"
+          errors=$((errors+1))
+        else
+          echo "GPU (vulkan): $(sed 's/.*= *//' <<< "$gpu_line")"
+        fi
+      fi
+      ;;
+    rocm)
+      if ! command -v rocminfo >/dev/null 2>&1; then
+        fail "rocminfo not found in WSL; ROCm runtime is not installed"
+        errors=$((errors+1))
+      else
+        gfx="$(rocminfo 2>/dev/null | grep -oE 'gfx[0-9a-f]+' | sort -u | tr '\n' ' ' || true)"
+        if [[ -z "$gfx" ]]; then
+          fail "rocminfo found no GPU agent"
+          errors=$((errors+1))
+        else
+          echo "GPU (rocm): $gfx"
+          if ! grep -q "$expected_gfx" <<< "$gfx"; then
+            echo "WARN: expected $expected_gfx (Strix Halo), rocminfo reports: $gfx"
+          fi
+        fi
+      fi
+      ;;
+    *)
+      fail "unknown AMD_RUNTIME '$amd_runtime' (expected: vulkan or rocm)"
+      errors=$((errors+1))
+      ;;
+  esac
 fi
 
 if [[ ! -f "$PROJECT_DIR/.env" ]]; then

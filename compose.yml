@@ -19,7 +19,7 @@ services:
       - --threads
       - ${LLAMA_THREADS:-8}
     volumes:
-      - ./models:/models:ro
+      - ${MODELS_DIR:-./models}:/models:ro
     networks:
       homelab-ai-net:
         aliases:

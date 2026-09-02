@@ -16,7 +16,7 @@ This keeps the future NVIDIA-to-AMD change below the gateway boundary.
 
 - container: `homelab-ai-llama`
 - internal port: 8080
-- model mount: `./models:/models:ro`
+- model mount: `${MODELS_DIR:-./models}:/models:ro`
 - host port: none
 - current backend override: CUDA 13
 - future candidate override: Vulkan, unvalidated
@@ -49,6 +49,26 @@ This keeps the future NVIDIA-to-AMD change below the gateway boundary.
 - `no-new-privileges`
 - read-only container root filesystem
 - writable project mount only at `/workspace`, plus bounded tmpfs `/tmp`
+
+### PostgreSQL
+
+- container: `homelab-ai-postgres`
+- internal port: 5432
+- host port: none
+- data: `data/postgres/`
+- role: canonical state. This is the copy that must survive.
+- GPU-independent
+
+### Qdrant
+
+- container: `homelab-ai-qdrant`
+- internal port: 6333
+- host port: none
+- data: `data/qdrant/`
+- role: vector index. Explicitly **rebuildable**: deleting `data/qdrant/` and
+  re-indexing from the sources must always restore a working system. Anything
+  that cannot be rebuilt this way belongs in PostgreSQL, not here.
+- GPU-independent
 
 ## Network
 

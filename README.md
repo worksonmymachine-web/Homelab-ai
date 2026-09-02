@@ -10,9 +10,14 @@ Included now:
 - `homelab-ai-litellm` — stable OpenAI-compatible gateway
 - `homelab-ai-searxng` — private search service
 - `homelab-ai-sandbox` — non-root coding sandbox
+- `homelab-ai-postgres` — portable PostgreSQL core (canonical state)
+- `homelab-ai-qdrant` — portable vector index
 - `homelab-ai-net` — dedicated Docker bridge network
 
-Not included: Open WebUI, OpenJarvis, n8n, Qdrant, ChromaDB, LightRAG, Evolution API, MCP integrations, training, clustering, CAD/CAE automation.
+PostgreSQL holds canonical state; Qdrant holds the vector index and is treated as
+rebuildable — dropping it and re-indexing from the sources must always be possible.
+
+Not included: Open WebUI, OpenJarvis, n8n, ChromaDB, LightRAG, Evolution API, MCP integrations, training, clustering, CAD/CAE automation.
 
 ## Safety boundary
 
@@ -40,8 +45,10 @@ homelab-ai-llama :8080 (internal only)
   +-- NVIDIA CUDA today
   +-- AMD Vulkan/ROCm later after validation
 
-homelab-ai-searxng :8888 (localhost only)
-homelab-ai-sandbox (no host port)
+homelab-ai-searxng  :8888 (localhost only)
+homelab-ai-sandbox  (no host port)
+homelab-ai-postgres :5432 (internal only) -- canonical state
+homelab-ai-qdrant   :6333 (internal only) -- rebuildable index
 ```
 
 ## First run on the NVIDIA development PC
