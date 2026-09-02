@@ -71,9 +71,69 @@ t8() {
     "$llama_img" \
     "${LITELLM_IMAGE:-ghcr.io/berriai/litellm:v1.94.0}" \
     "${SEARXNG_IMAGE:-ghcr.io/searxng/searxng:2026.8.20-8d3dd0cd4}" \
-    "${SANDBOX_IMAGE:-homelab-ai-sandbox:0.1.0}"; do
+    "${SANDBOX_IMAGE:-homelab-ai-sandbox:0.1.0}" \
+    "${POSTGRES_IMAGE:-postgres:18.6-bookworm}" \
+    "${QDRANT_IMAGE:-qdrant/qdrant:v1.18.1}"; do
     docker image inspect "$img" >/dev/null || return 1
   done
+}
+
+
+t9() {
+  container_running homelab-ai-postgres || return 1
+  docker exec homelab-ai-postgres pg_isready \
+    -U "${POSTGRES_USER:-homelab_ai}" \
+    -d "${POSTGRES_DB:-homelab_ai}" >/dev/null 2>&1 || return 1
+  [[ "$(docker exec homelab-ai-postgres psql \
+    -U "${POSTGRES_USER:-homelab_ai}" \
+    -d "${POSTGRES_DB:-homelab_ai}" \
+    -Atqc 'SELECT 1;')" == "1" ]]
+}
+
+
+t10() {
+  container_running homelab-ai-qdrant || return 1
+  docker exec -i homelab-ai-litellm python - <<'PYQ'
+import json
+import urllib.request
+
+base = "http://homelab-ai-qdrant:6333"
+name = "homelab_smoke_test"
+
+def req(method, path, body=None):
+    data = None if body is None else json.dumps(body).encode()
+    r = urllib.request.Request(
+        base + path,
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(r, timeout=10) as resp:
+        if not 200 <= resp.status < 300:
+            raise RuntimeError(f"{method} {path}: HTTP {resp.status}")
+        raw = resp.read()
+        return json.loads(raw) if raw else None
+
+with urllib.request.urlopen(base + "/readyz", timeout=10) as resp:
+    assert resp.status == 200
+
+try:
+    req("DELETE", f"/collections/{name}")
+except Exception:
+    pass
+
+try:
+    req("PUT", f"/collections/{name}", {
+        "vectors": {"size": 4, "distance": "Cosine"}
+    })
+    info = req("GET", f"/collections/{name}")
+    assert info["result"]["config"]["params"]["vectors"]["size"] == 4
+finally:
+    try:
+        req("DELETE", f"/collections/{name}")
+    except Exception:
+        pass
+PYQ
 }
 
 require_docker || exit 1
@@ -85,10 +145,12 @@ run_test 5 "Sandbox executes code as non-root" t5
 run_test 6 "Internal project network works" t6
 run_test 7 "Sandbox isolation invariants" t7
 run_test 8 "Required image set is resolvable for export" t8
+run_test 9 "PostgreSQL healthy" t9
+run_test 10 "Qdrant healthy and writable" t10
 
 printf '\n==============================\n'
 if (( failures == 0 )); then
-  echo "PASS: all 8 smoke tests passed"
+  echo "PASS: all 10 smoke tests passed"
   exit 0
 else
   echo "FAIL: $failures test(s) failed"
