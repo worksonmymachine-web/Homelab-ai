@@ -1,10 +1,58 @@
 model_list:
-  - model_name: local-qwen
+
+  - model_name: local-study
     litellm_params:
-      model: openai/local-qwen
-      api_base: http://homelab-ai-llama:8080/v1
-      api_key: not-needed
+      model: openai/local
+      api_base: http://host.docker.internal:8081/v1
+      api_key: "not-needed"
+    model_info:
+      mode: chat
+
+  - model_name: local-quality
+    litellm_params:
+      model: openai/local
+      api_base: http://host.docker.internal:8082/v1
+      api_key: "not-needed"
+    model_info:
+      mode: chat
+
+  - model_name: local-fast
+    litellm_params:
+      model: openai/local
+      api_base: http://host.docker.internal:8083/v1
+      api_key: "not-needed"
+    model_info:
+      mode: chat
+
+  - model_name: local-code
+    litellm_params:
+      model: openai/local
+      api_base: http://host.docker.internal:8084/v1
+      api_key: "not-needed"
+    model_info:
+      mode: chat
+
+  - model_name: npu-fast
+    litellm_params:
+      model: openai/Llama-3.2-3B-Instruct-FLM
+      api_base: http://host.docker.internal:13305/v1
+      api_key: "not-needed"
+    model_info:
+      mode: chat
+
+  - model_name: local-embed
+    litellm_params:
+      model: openai/bge-m3
+      api_base: http://host.docker.internal:8085/v1
+      api_key: "not-needed"
+    model_info:
+      mode: embedding
 
 litellm_settings:
   drop_params: true
+  json_logs: true
+  set_verbose: false
   request_timeout: 120
+
+general_settings:
+  telemetry: false
