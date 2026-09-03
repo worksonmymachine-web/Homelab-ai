@@ -3,9 +3,12 @@ import hashlib
 import uuid
 import re
 import argparse
+import subprocess
 import psycopg2
 from psycopg2.extras import execute_values
 import sys
+
+MIN_AVG_CHARS_PER_PAGE = 50
 
 def get_source_id(file_path):
     """Genera un source_id deterministico basato sul path assoluto del file."""
@@ -51,6 +54,22 @@ def split_text_into_chunks(content, max_chunk_size=1000):
                 chunks.append(current_chunk)
     return chunks
 
+def extract_pdf_pages(file_path):
+    """Estrae il testo di un PDF pagina per pagina via pdftotext (poppler-utils).
+
+    Ritorna una lista di stringhe, una per pagina. Propaga qualunque
+    eccezione (binario assente, PDF corrotto, ecc.) al chiamante: la
+    gestione errori/soglia resta nel loop principale.
+    """
+    result = subprocess.run(
+        ["pdftotext", "-layout", file_path, "-"],
+        capture_output=True, text=True, check=True
+    )
+    pages = result.stdout.split("\f")
+    if pages and pages[-1] == "":
+        pages.pop()
+    return pages
+
 def main(root_dir):
     # Validazione directory
     if not os.path.isdir(root_dir):
@@ -82,11 +101,12 @@ def main(root_dir):
         with conn.cursor() as cur:
             for root, _, files in os.walk(root_dir):
                 for file in files:
-                    if not file.endswith(('.txt', '.md')):
+                    if not file.endswith(('.txt', '.md', '.pdf')):
                         continue
 
                     file_path = os.path.join(root, file)
                     total_files += 1
+                    is_pdf = file.endswith('.pdf')
 
                     try:
                         # Calcolo SHA256 contenuto
@@ -103,7 +123,12 @@ def main(root_dir):
                         """, (file_path,))
                         row = cur.fetchone()
 
-                        mime_type = "text/markdown" if file.endswith('.md') else "text/plain"
+                        if is_pdf:
+                            mime_type = "application/pdf"
+                        elif file.endswith('.md'):
+                            mime_type = "text/markdown"
+                        else:
+                            mime_type = "text/plain"
                         doc_title = os.path.splitext(file)[0]
 
                         if not row:
@@ -146,23 +171,56 @@ def main(root_dir):
                         # Il file e' nuovo o cambiato: rigenera i chunk
                         cur.execute("DELETE FROM chunks WHERE source_id = %s", (source_id,))
 
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-
-                        chunk_texts = split_text_into_chunks(content)
-                        chunk_records = [
-                            (
-                                f"{source_id}:{index}",
-                                source_id,
-                                index,
-                                None,  # page
-                                None,  # section
-                                None,  # heading
-                                chunk_text,
-                                len(chunk_text)
+                        if is_pdf:
+                            pages = extract_pdf_pages(file_path)
+                            avg_chars = (
+                                sum(len(p.strip()) for p in pages) / len(pages)
+                                if pages else 0
                             )
-                            for index, chunk_text in enumerate(chunk_texts)
-                        ]
+                            if avg_chars < MIN_AVG_CHARS_PER_PAGE:
+                                cur.execute("""
+                                    UPDATE sources
+                                    SET status = 'error', updated_at = now()
+                                    WHERE source_id = %s
+                                """, (source_id,))
+                                print(f"[ingest] {file_path} - PROBABILE SCANSIONE/OCR DI BASSA QUALITA', serve consensus OCR (M4) - saltato")
+                                error_files += 1
+                                conn.commit()
+                                continue
+
+                            chunk_records = []
+                            index = 0
+                            for page_num, page_text in enumerate(pages, start=1):
+                                for chunk_text in split_text_into_chunks(page_text):
+                                    chunk_records.append((
+                                        f"{source_id}:{index}",
+                                        source_id,
+                                        index,
+                                        page_num,  # page
+                                        None,  # section
+                                        None,  # heading
+                                        chunk_text,
+                                        len(chunk_text)
+                                    ))
+                                    index += 1
+                        else:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                content = f.read()
+
+                            chunk_texts = split_text_into_chunks(content)
+                            chunk_records = [
+                                (
+                                    f"{source_id}:{index}",
+                                    source_id,
+                                    index,
+                                    None,  # page
+                                    None,  # section
+                                    None,  # heading
+                                    chunk_text,
+                                    len(chunk_text)
+                                )
+                                for index, chunk_text in enumerate(chunk_texts)
+                            ]
 
                         if chunk_records:
                             execute_values(cur, """
