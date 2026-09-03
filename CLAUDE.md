@@ -20,10 +20,6 @@ sbagliare edge case.
 
 ## Ambiente di esecuzione (importante, non re-investigare)
 
-- `bash` su questa macchina è lo stub WSL (`C:\Windows\System32\bash.exe`):
-  ogni script .sh lanciato da Claude Code gira DENTRO WSL, non su Windows nativo.
-- python3 esiste in WSL, NON su PowerShell/Windows nativo. Non serve installare
-  python su Windows: gli script bash lo trovano già in WSL.
-- `./scripts/ask-qwen.sh` funziona così com'è, verificato il 3 settembre 2026.
-  Se sembra fallire, il problema è altrove (LiteLLM/llama-server spenti), non
-  python3 mancante.
+- Il Bash tool di Claude Code è Git Bash/MSYS (python3 non reale, solo lo
+  stub Store). Da un terminale WSL separato, python3 è reale.
+  `ask-qwen.sh` fa auto-detect per gestire entrambi i casi.
