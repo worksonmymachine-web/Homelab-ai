@@ -17,3 +17,13 @@ sbagliare edge case.
   eseguito in un servizio Docker dedicato sulla rete `homelab-ai-net`
   (Postgres non ha porta esposta all'host, per scelta di sicurezza)
 - Golden dataset: si riparte da zero (v0.2 precedente abbandonato volutamente)
+
+## Ambiente di esecuzione (importante, non re-investigare)
+
+- `bash` su questa macchina è lo stub WSL (`C:\Windows\System32\bash.exe`):
+  ogni script .sh lanciato da Claude Code gira DENTRO WSL, non su Windows nativo.
+- python3 esiste in WSL, NON su PowerShell/Windows nativo. Non serve installare
+  python su Windows: gli script bash lo trovano già in WSL.
+- `./scripts/ask-qwen.sh` funziona così com'è, verificato il 3 settembre 2026.
+  Se sembra fallire, il problema è altrove (LiteLLM/llama-server spenti), non
+  python3 mancante.
