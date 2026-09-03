@@ -19,3 +19,4 @@ logs/*
 __pycache__/
 *.pyc
 .DS_Store
+data/golden-dataset/golden_dataset.yaml
