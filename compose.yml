@@ -170,6 +170,34 @@ services:
       io.homelab-ai.project: homelab-ai
       io.homelab-ai.component: qdrant
 
+  ingestion:
+    container_name: homelab-ai-ingestion
+    image: ${INGESTION_IMAGE:-homelab-ai-ingestion:0.1.0}
+    build:
+      context: .
+      dockerfile: docker/ingestion/Dockerfile
+    restart: "no"
+    profiles:
+      - tools
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-homelab_ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-homelab_ai}
+    volumes:
+      - ./data/ingestion-input:/data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      homelab-ai-net:
+        aliases:
+          - homelab-ai-ingestion
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      io.homelab-ai.project: homelab-ai
+      io.homelab-ai.component: ingestion
+
 networks:
   homelab-ai-net:
     name: homelab-ai-net
